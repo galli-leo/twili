@@ -30,11 +30,11 @@ namespace twib {
 namespace tool {
 namespace gdb {
 
-GdbStub::GdbStub(ITwibDeviceInterface &itdi) :
+GdbStub::GdbStub(ITwibDeviceInterface &itdi, int input, int output) :
 	itdi(itdi),
 	connection(
-		platform::File(STDIN_FILENO, false),
-		platform::File(STDOUT_FILENO, false)),
+		platform::File(input, false),
+		platform::File(output, false)),
 	logic(*this),
 	loop(logic),
 	xfer_libraries(*this, &GdbStub::XferReadLibraries) {

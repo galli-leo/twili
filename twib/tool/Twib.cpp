@@ -246,6 +246,12 @@ int main(int argc, char *argv[]) {
 
 #if TWIB_GDB_ENABLED == 1
 	CLI::App *gdb = app.add_subcommand("gdb", "Opens an enhanced GDB stub for the device");
+	std::string gdb_host;
+	int gdb_port = -1;
+    bool gdb_server = false;
+    gdb->add_flag("-s,--server", gdb_server, "Whether to start a gdbserver like server, that listens for incoming connections and runs the gdb stub against them.");
+	gdb->add_option("--host", gdb_host, "Host to use for listening on socket. Works like gdbserver with this option (and --port).")->default_val("127.0.0.1");
+	gdb->add_option("-p,--port", gdb_port, "Port to use for listening on socket. See --host.")->default_val("4000");
 #endif
 
 	CLI::App *launch = app.add_subcommand("launch", "Launches an installed title");
@@ -533,8 +539,39 @@ int main(int argc, char *argv[]) {
 
 #if TWIB_GDB_ENABLED == 1
 	if(gdb->parsed()) {
-		tool::gdb::GdbStub stub(itdi);
-		stub.Run();
+		if (gdb_server) {
+			LogMessage(Message, "Starting gdbstub server on %s:%d", gdb_host.c_str(), gdb_port);
+			platform::Socket socket(AF_INET, SOCK_STREAM, 0);
+
+			int opt = 1;
+
+			/*if (socket.SetSockOpt(SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt))) {
+				LogMessage(Error, "Error setting socket options.");
+				return 1;
+			}*/
+
+			struct sockaddr_in address;
+			address.sin_family = AF_INET;
+			inet_aton(gdb_host.c_str(), &address.sin_addr);
+			address.sin_port = htons(gdb_port);
+
+			int addr_len = sizeof(address);
+
+			socket.Bind((struct sockaddr *) &address, addr_len);
+			socket.Listen(3);
+
+			// TODO: Maybe add a more graceful loop?
+			while (true) {
+				LogMessage(Message, "Listening for connections...");
+				platform::Socket new_socket = socket.Accept((struct sockaddr *) &address, (socklen_t *)&addr_len);
+				LogMessage(Message, "Accepted connection.");
+				tool::gdb::GdbStub stub(itdi, new_socket.fd, new_socket.fd);
+				stub.Run();
+			}
+		} else {
+			tool::gdb::GdbStub stub(itdi);
+			stub.Run();
+		}
 		return 0;
 	}
 #endif

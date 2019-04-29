@@ -34,7 +34,7 @@ namespace gdb {
 
 class GdbStub {
  public:
-	GdbStub(ITwibDeviceInterface &itdi);
+	GdbStub(ITwibDeviceInterface &itdi, int input = STDIN_FILENO, int output = STDOUT_FILENO);
 	~GdbStub();
 	
 	void Run();
